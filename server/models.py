@@ -25,8 +25,13 @@ class Activity(db.Model, SerializerMixin):
     difficulty = db.Column(db.Integer)
 
     # Add relationship
+    signups = db.relationship('Signup', back_populates='activity', cascade='all, delete-orphan')
+
+    campers = association_proxy('signups', 'camper',
+                                 creator=lambda camper_obj: Signup(camper=camper_obj))
     
     # Add serialization rules
+    serialize_rules = ('-signups.activity',)
     
     def __repr__(self):
         return f'<Activity {self.id}: {self.name}>'
@@ -40,10 +45,26 @@ class Camper(db.Model, SerializerMixin):
     age = db.Column(db.Integer)
 
     # Add relationship
+    signups = db.relationship('Signup', back_populates='camper', cascade='all, delete-orphan')
+
+    activities = association_proxy('signups', 'activity',
+                                    creator=lambda activity_obj: Signup(activity=activity_obj))
     
     # Add serialization rules
+    serialize_rules = ('-signups.camper',)
     
     # Add validation
+    @validates('name')
+    def validate_name(self, key, name):
+        if not name:
+            raise ValueError('Please enter a name.')
+        return name
+    
+    @validates('age')
+    def validate_age(self, key, age):
+        if age is None or not 8 <= age <= 18:
+            raise ValueError('Please enter an age between 8 and 18.')
+        return age
     
     
     def __repr__(self):
@@ -56,11 +77,22 @@ class Signup(db.Model, SerializerMixin):
     id = db.Column(db.Integer, primary_key=True)
     time = db.Column(db.Integer)
 
+    activity_id = db.Column(db.Integer, db.ForeignKey('activities.id'), nullable=False)
+    camper_id = db.Column(db.Integer, db.ForeignKey('campers.id'), nullable=False)
+
     # Add relationships
+    activity = db.relationship('Activity', back_populates='signups')
+    camper = db.relationship('Camper', back_populates='signups')
     
     # Add serialization rules
+    serialize_rules = ('-activity.signups', '-camper.signups',)
     
     # Add validation
+    @validates('time')
+    def validate_time(self, key, time):
+        if time is None or not 0 <= time <= 23:
+            raise ValueError('Please enter a number between 0 and 23 to represent time via the hour on a 24 hour clock.')
+        return time
     
     def __repr__(self):
         return f'<Signup {self.id}>'
